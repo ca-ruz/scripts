@@ -54,7 +54,7 @@ case $choice in
     3)
         read -p "Enter amount: " amount
         read -p "Enter fiat currency (e.g. USD): " fiat
-        fiat=$(echo "$fiat" | tr '[:upper:]' '[:lower:]')
+        fiat=$(echo "$fiat" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
         rate=$(curl -s "$COINGECKO_API/simple/price?ids=bitcoin&vs_currencies=$fiat" | jq -r ".bitcoin.$fiat")
 
         if [[ "$rate" == "null" || -z "$rate" ]]; then
@@ -68,8 +68,8 @@ case $choice in
         ;;
     4)
         read -p "Enter date (YYYY-MM-DD): " date
-        read -p "Enter fiat currency (e.g. USD): " fiat
-        fiat=$(echo "$fiat" | tr '[:upper:]' '[:lower:]')
+        read -p "Enter fiat currency (e.g. USD or USD, MXN): " fiat_input
+        fiat_input=$(echo "$fiat_input" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
         formatted_date=$(date -d "$date" '+%d-%m-%Y' 2>/dev/null)
 
         if [[ -z "$formatted_date" ]]; then
@@ -77,17 +77,18 @@ case $choice in
             exit 1
         fi
 
-        result=$(curl -s "$COINGECKO_API/coins/bitcoin/history?date=$formatted_date" | jq -r ".market_data.current_price.$fiat")
-
-        if [[ "$result" == "null" || -z "$result" ]]; then
-            log "No data found for $date in $fiat"
-        else
-            formatted_result=$(awk "BEGIN {printf \"%.2f\", $result}")
-            log "BTC price on $date: $formatted_result $fiat"
-        fi
+        IFS=',' read -ra fiat_list <<< "$fiat_input"
+        for fiat in "${fiat_list[@]}"; do
+            result=$(curl -s "$COINGECKO_API/coins/bitcoin/history?date=$formatted_date" | jq -r ".market_data.current_price.$fiat")
+            if [[ "$result" == "null" || -z "$result" ]]; then
+                log "No data found for $date in $fiat"
+            else
+                formatted_result=$(awk "BEGIN {printf \"%.2f\", $result}")
+                log "BTC price on $date: $formatted_result $fiat"
+            fi
+        done
         ;;
     *)
         log "Invalid choice"
         ;;
 esac
-
